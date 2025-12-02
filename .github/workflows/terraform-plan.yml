@@ -1,6 +1,7 @@
 name: Terraform PR Plan
 
 on:
+  workflow_dispatch: {}
   pull_request:
     types: [opened, synchronize, reopened]
 
@@ -27,7 +28,7 @@ jobs:
 
       - name: Terraform Init
         working-directory: ./terraform
-        run: terraform init -input=false -backend-config="bucket=${{ secrets.TFSTATE_BUCKET }}" -backend-config="dynamodb_table=${{ secrets.DYNAMODB_TABLE }}" -backend-config="region=${{ secrets.AWS_REGION }}"
+        run: terraform init
 
       - name: Terraform Format Check
         working-directory: ./terraform

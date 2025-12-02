@@ -1,0 +1,86 @@
+name: CI Main - Apply + Build + Deploy
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform-apply:
+    runs-on: ubuntu-latest
+    outputs:
+      kubeconfig: ${{ steps.write-kubeconfig.outputs.kubeconfig-path }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init -input=false -backend-config="bucket=${{ secrets.TFSTATE_BUCKET }}" -backend-config="dynamodb_table=${{ secrets.DYNAMODB_TABLE }}" -backend-config="region=${{ secrets.AWS_REGION }}"
+
+      - name: Terraform Apply (auto-approve)
+        working-directory: ./terraform
+        run: terraform apply -auto-approve
+
+      - name: Output kubeconfig to file
+        id: write-kubeconfig
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/.kube
+          # assumes your terraform outputs cluster_name and cluster_region
+          aws eks update-kubeconfig --name $(terraform output -raw cluster_name) --region $(terraform output -raw cluster_region) --kubeconfig $GITHUB_WORKSPACE/.kube/config
+          echo "::set-output name=kubeconfig-path::$GITHUB_WORKSPACE/.kube/config"
+
+  build-and-deploy:
+    needs: terraform-apply
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials to push to ECR
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./app
+          push: true
+          tags: ${{ steps.ecr-login.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+
+      - name: Set KUBECONFIG
+        run: |
+          mkdir -p $HOME/.kube
+          # copy kubeconfig created by previous job
+          cp ${{ needs.terraform-apply.outputs.kubeconfig }} $HOME/.kube/config
+          export KUBECONFIG=$HOME/.kube/config
+        shell: bash
+
+      - name: Deploy to EKS (kubectl apply)
+        run: |
+          # Replace image reference in deployment manifest or use `kubectl set image`
+          sed -i "s|IMAGE_PLACEHOLDER|${{ steps.ecr-login.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}|g" ./app/k8s/deployment.yaml
+          kubectl apply -f ./app/k8s
