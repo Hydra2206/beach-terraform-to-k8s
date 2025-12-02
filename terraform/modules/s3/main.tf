@@ -9,15 +9,15 @@ resource "aws_s3_bucket" "mittu-bkt" {
 resource "aws_s3_object" "photo-1" {
   bucket = aws_s3_bucket.mittu-bkt.bucket
   key    = "/photos/beach.png"
-  source = "D:/second-terraform-project/beach.png"
-  etag = filemd5("D:/second-terraform-project/beach.png")
+  source = "https://github.com/Hydra2206/beach-terraform-to-k8s/blob/main/terraform/beach.png"
+  etag = filemd5("https://github.com/Hydra2206/beach-terraform-to-k8s/blob/main/terraform/bitch.png")
 }
 
 resource "aws_s3_object" "photo-2" {
   bucket = aws_s3_bucket.mittu-bkt.bucket
   key    = "/photos/bitch.png"
-  source = "D:/second-terraform-project/bitch.png"
-  etag = filemd5("D:/second-terraform-project/bitch.png")
+  source = "https://github.com/Hydra2206/beach-terraform-to-k8s/blob/main/terraform/bitch.png"
+  etag = filemd5("https://github.com/Hydra2206/beach-terraform-to-k8s/blob/main/terraform/bitch.png")
 }
 
 #created for public access
