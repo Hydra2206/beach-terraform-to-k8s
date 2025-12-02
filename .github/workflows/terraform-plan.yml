@@ -28,7 +28,7 @@ jobs:
 
       - name: Terraform Init
         working-directory: ./terraform
-        run: terraform init -input=false -backend-config="bucket=${{ secrets.TFSTATE_BUCKET }}" -backend-config="dynamodb_table=${{ secrets.DYNAMODB_TABLE }}" -backend-config="region=${{ secrets.AWS_REGION }}"
+        run: terraform init -input=false -backend-config="bucket=${{ secrets.TFSTATE_BUCKET }}" -backend-config="region=${{ secrets.AWS_REGION }}"
 
       - name: Terraform Format Check
         working-directory: ./terraform
