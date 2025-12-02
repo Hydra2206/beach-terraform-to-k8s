@@ -10,8 +10,8 @@ module "vpc" {
   name = "${var.cluster_name}-vpc"
   cidr = var.vpc_cidr
 
-  azs             = ["${var.region}a","${var.region}b","${var.region}c"]
-  private_subnets  = var.private_subnets
+  azs             = ["${var.region}a", "${var.region}b", "${var.region}c"]
+  private_subnets = var.private_subnets
 
   enable_nat_gateway = false
   single_nat_gateway = true
@@ -26,10 +26,10 @@ module "subnets" {
   subnet-3-cidr = var.subnet_3_cidr
   subnet-1-az   = var.subnet_1_az
   subnet-2-az   = var.subnet_2_az
-  subnet-3-az = var.subnet_3_az
+  subnet-3-az   = var.subnet_3_az
   vpc_id        = module.vpc.vpc_id
-  
-  
+
+
 }
 
 #created IGW
@@ -40,9 +40,9 @@ module "igw" {
 
 #created RT & associations
 module "route-table" {
-  source             = "./modules/route_table"
-  vpc_id             = module.vpc.vpc_id
-  igw_id             = module.igw.igw_id
+  source          = "./modules/route_table"
+  vpc_id          = module.vpc.vpc_id
+  igw_id          = module.igw.igw_id
   public_subnet_1 = module.subnets.public_subnet_1
   public_subnet_2 = module.subnets.public_subnet_2
   public_subnet_3 = module.subnets.public_subnet_3
@@ -101,9 +101,9 @@ resource "aws_iam_role" "eks_cluster_role" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
+        Effect    = "Allow"
         Principal = { Service = "eks.amazonaws.com" }
-        Action = "sts:AssumeRole"
+        Action    = "sts:AssumeRole"
       }
     ]
   })
@@ -124,9 +124,9 @@ resource "aws_iam_role" "node_group_role" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
+        Effect    = "Allow"
         Principal = { Service = "ec2.amazonaws.com" }
-        Action = "sts:AssumeRole"
+        Action    = "sts:AssumeRole"
       }
     ]
   })
@@ -151,10 +151,10 @@ resource "aws_iam_role_policy_attachment" "node_attach_ecr" {
 resource "aws_eks_cluster" "cluster" {
   name     = var.cluster_name
   role_arn = aws_iam_role.eks_cluster_role.arn
-  version  = "1.32"   # pick a K8s version; update as desired
+  version  = "1.32" # pick a K8s version; update as desired
 
   vpc_config {
-    subnet_ids = concat(module.vpc.public_subnets, module.vpc.private_subnets)
+    subnet_ids              = concat(module.vpc.public_subnets, module.vpc.private_subnets)
     endpoint_private_access = true
     endpoint_public_access  = true
   }
@@ -167,7 +167,7 @@ resource "aws_eks_node_group" "workers" {
   cluster_name    = aws_eks_cluster.cluster.name
   node_group_name = var.node_group_name
   node_role_arn   = aws_iam_role.node_group_role.arn
-  subnet_ids      = [module.subnets.public_subnet_1,module.subnets.public_subnet_2,module.subnets.public_subnet_3]
+  subnet_ids      = [module.subnets.public_subnet_1, module.subnets.public_subnet_2, module.subnets.public_subnet_3]
 
   scaling_config {
     desired_size = 1
@@ -186,19 +186,19 @@ resource "aws_eks_node_group" "workers" {
 #creating ECR resource 
 resource "aws_ecr_repository" "ecr_repo" {
   name                 = var.ecr_name
-  image_tag_mutability = "IMMUTABLE"        # prevents tag mutation (recommended)
+  image_tag_mutability = "IMMUTABLE" # prevents tag mutation (recommended)
   image_scanning_configuration {
-    scan_on_push = false                     # enable scan on push
+    scan_on_push = false # enable scan on push
   }
 
   encryption_configuration {
-    encryption_type = "AES256"              # or "KMS" and supply kms_key
+    encryption_type = "AES256" # or "KMS" and supply kms_key
   }
 
   tags = var.ecr_tags
 
   lifecycle {
-    prevent_destroy = false                 # consider true for production (careful)
+    prevent_destroy = false # consider true for production (careful)
   }
 }
 
