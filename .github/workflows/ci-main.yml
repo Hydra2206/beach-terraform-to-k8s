@@ -133,21 +133,16 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_TERRAFORM }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Debug - List terraform dir (optional)
-        run: |
-          echo "PWD: $(pwd)"
-          ls -la ${{ env.TERRAFORM_DIR }} || true
-
       - name: Terraform init (for destroy)
-        working-directory: ${{ env.TERRAFORM_DIR }}
+        working-directory: ./terraform
         run: terraform init -input=false
 
       - name: Terraform refresh state (best-effort)
-        working-directory: ${{ env.TERRAFORM_DIR }}
+        working-directory: ./terraform
         run: terraform refresh -input=false || true
 
       - name: Terraform Destroy (cleanup)
-        working-directory: ${{ env.TERRAFORM_DIR }}
+        working-directory: ./terraform
         run: |
           echo "Terraform apply failed; attempting terraform destroy to clean up resources..."
           # Attempt to destroy whatever terraform state knows about.
