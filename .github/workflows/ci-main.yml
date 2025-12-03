@@ -58,7 +58,13 @@ jobs:
 
       - name: Terraform Apply (auto-approve)
         working-directory: ./terraform
-        run: terraform apply -auto-approve
+        run: |
+          # Try applying the exact plan. Capture exit code so we can continue and set output.
+          if terraform apply -auto-approve tfplan.binary; then
+            echo "apply_status=success" >> $GITHUB_OUTPUT
+          else
+            echo "apply_status=failure" >> $GITHUB_OUTPUT
+          fi
 
       - name: Output kubeconfig to file
         id: write-kubeconfig
@@ -106,3 +112,46 @@ jobs:
           # Replace image reference in deployment manifest or use `kubectl set image`
           sed -i "s|IMAGE_PLACEHOLDER|${{ steps.ecr-login.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}|g" ./app/k8s/deployment.yaml
           kubectl apply -f ./app/k8s
+
+  destroy-on-failure:
+    name: Terraform Destroy (runs only if terraform apply failed)
+    needs: terraform-apply
+    runs-on: ubuntu-latest
+    if: needs.terraform-apply.outputs.apply_status == 'failure'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Configure AWS credentials via OIDC (for destroy)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_TERRAFORM }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Debug - List terraform dir (optional)
+        run: |
+          echo "PWD: $(pwd)"
+          ls -la ${{ env.TERRAFORM_DIR }} || true
+
+      - name: Terraform init (for destroy)
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: terraform init -input=false
+
+      - name: Terraform refresh state (best-effort)
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: terraform refresh -input=false || true
+
+      - name: Terraform Destroy (cleanup)
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          echo "Terraform apply failed; attempting terraform destroy to clean up resources..."
+          # Attempt to destroy whatever terraform state knows about.
+          terraform destroy -auto-approve || {
+            echo "terraform destroy failed. Investigate manual cleanup."
+            exit 1
+          }
