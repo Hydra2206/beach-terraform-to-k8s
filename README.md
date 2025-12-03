@@ -10,3 +10,5 @@ Creating a project for resume &amp; learning how to create CI/CD pipeline for Te
 Problem -> Terraform Plan me aake stuck hoja raha hai woh var.ami ki value expect kar raha hai, locally toh variables ki value terraform.tfvars se mil jata hai but ab yeh find out karna hai ki pipeline me variables ki values kaise pass karte hai
 
 Solution -> Jitne bhi variables hai tf code me un sabko AWS secrets manager me store kiya in a single secret file(JSON key-vaue), then iam oidc role me ek policy attach kiya joh woh secrets ko read kar paye Github action me jab CI pipeline run hoga tab, then terraform plan workflow me bhi changes kiya.
+
+3/12/2025 - terraform-plan.yml workflow success bahut sare fixes karne ke baad
