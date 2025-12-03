@@ -60,7 +60,7 @@ jobs:
         working-directory: ./terraform
         run: |
           # Try applying the exact plan. Capture exit code so we can continue and set output.
-          if terraform apply -auto-approve tfplan.binary; then
+          if terraform apply -auto-approve; then
             echo "apply_status=success" >> $GITHUB_OUTPUT
           else
             echo "apply_status=failure" >> $GITHUB_OUTPUT
