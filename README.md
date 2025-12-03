@@ -12,3 +12,4 @@ Problem -> Terraform Plan me aake stuck hoja raha hai woh var.ami ki value expec
 Solution -> Jitne bhi variables hai tf code me un sabko AWS secrets manager me store kiya in a single secret file(JSON key-vaue), then iam oidc role me ek policy attach kiya joh woh secrets ko read kar paye Github action me jab CI pipeline run hoga tab, then terraform plan workflow me bhi changes kiya.
 
 3/12/2025 - terraform-plan.yml workflow success bahut sare fixes karne ke baad
+            ci-main.yml workflow me ek stage add kiya hu joh ki yeh ensure karega ki jab bhi terraform apply stage fail hojayega tab terraform destroy stage run hoga joh ki woh resources ko delete kar dengi joh apply ke                time pura create nahi ho payi thi
