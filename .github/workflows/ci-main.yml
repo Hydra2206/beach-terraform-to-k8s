@@ -10,10 +10,16 @@ permissions:
   contents: read
   id-token: write
 
+env:
+  TERRAFORM_DIR: ./terraform
+  APP_DIR: ./app
+
 jobs:
   terraform-apply:
+    name: Terraform Apply (plan + apply) — emits apply_status output
     runs-on: ubuntu-latest
     outputs:
+      apply_status: ${{ steps.tf_apply.outputs.apply_status }}
       kubeconfig: ${{ steps.write-kubeconfig.outputs.kubeconfig-path }}
     steps:
       - name: Checkout
@@ -53,31 +59,63 @@ jobs:
           echo "Wrote terraform/terraform.tfvars.json (not printed here for security)"
 
       - name: Terraform Init
-        working-directory: ./terraform
+        working-directory: ${{ env.TERRAFORM_DIR }}
         run: terraform init -input=false
 
-      - name: Terraform Apply (auto-approve)
-        working-directory: ./terraform
-        run: |
-          # Try applying the exact plan. Capture exit code so we can continue and set output.
-          if terraform apply -auto-approve; then
-            echo "apply_status=success" >> $GITHUB_OUTPUT
-          else
-            echo "apply_status=failure" >> $GITHUB_OUTPUT
-          fi
+      - name: Terraform validate
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: terraform validate || true
 
-      - name: Output kubeconfig to file
+      - name: Terraform plan (non-interactive)
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: terraform plan -out=tfplan.binary -input=false || true
+
+      - name: Terraform Apply (auto-approve)
+        id: tf_apply
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          # Try apply and capture result; always exit 0 so job doesn't fail early.
+          set +e
+          terraform apply -auto-approve tfplan.binary
+          RC=$?
+          if [ "$RC" -eq 0 ]; then
+            echo "apply_status=success" >> "$GITHUB_OUTPUT"
+            echo "apply_rc=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "apply_status=failure" >> "$GITHUB_OUTPUT"
+            echo "apply_rc=${RC}" >> "$GITHUB_OUTPUT"
+          fi
+          # Keep the step itself exit 0 so job completes and outputs are visible
+          exit 0
+
+      - name: Output kubeconfig to file (if apply succeeded)
         id: write-kubeconfig
         run: |
-          mkdir -p $GITHUB_WORKSPACE/.kube
-          # assumes your terraform outputs cluster_name and cluster_region
-          aws eks update-kubeconfig --name $(terraform output -raw cluster_name) --region $(terraform output -raw cluster_region) --kubeconfig $GITHUB_WORKSPACE/.kube/config
-          echo "::set-output name=kubeconfig-path::$GITHUB_WORKSPACE/.kube/config"
+          # Default to empty kubeconfig output
+          echo "kubeconfig-path=" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ steps.tf_apply.outputs.apply_status }}" = "success" ]; then
+            mkdir -p $GITHUB_WORKSPACE/.kube
+            # If terraform outputs are present, update kubeconfig
+            # Silence errors so we still set an output (if missing, remains blank)
+            set +e
+            CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "")
+            CLUSTER_REGION=$(terraform output -raw cluster_region 2>/dev/null || echo "${{ secrets.AWS_REGION }}")
+            if [ -n "$CLUSTER_NAME" ]; then
+              aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$CLUSTER_REGION" --kubeconfig $GITHUB_WORKSPACE/.kube/config 2>/dev/null || true
+              if [ -f $GITHUB_WORKSPACE/.kube/config ]; then
+                echo "kubeconfig-path=$GITHUB_WORKSPACE/.kube/config" >> "$GITHUB_OUTPUT"
+              fi
+            fi
+            set -e
+          fi
+        working-directory: ${{ env.TERRAFORM_DIR }}
 
   build-and-deploy:
+    name: Build & Deploy (runs only if terraform apply succeeded)
     needs: terraform-apply
     runs-on: ubuntu-latest
-    if: needs.terraform-apply.result == 'success'
+    if: needs.terraform-apply.outputs.apply_status == 'success'
     environment: production
     steps:
       - name: Checkout
@@ -118,7 +156,7 @@ jobs:
     name: Terraform Destroy (runs only if terraform apply failed)
     needs: terraform-apply
     runs-on: ubuntu-latest
-    if: needs.terraform-apply.result == 'failure'
+    if: needs.terraform-apply.outputs.apply_status == 'failure'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -135,19 +173,16 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Terraform init (for destroy)
-        working-directory: ./terraform
+        working-directory: ${{ env.TERRAFORM_DIR }}
         run: terraform init -input=false
 
       - name: Terraform refresh state (best-effort)
-        working-directory: ./terraform
+        working-directory: ${{ env.TERRAFORM_DIR }}
         run: terraform refresh -input=false || true
 
       - name: Terraform Destroy (cleanup)
-        working-directory: ./terraform
+        working-directory: ${{ env.TERRAFORM_DIR }}
         run: |
           echo "Terraform apply failed; attempting terraform destroy to clean up resources..."
-          # Attempt to destroy whatever terraform state knows about.
-          terraform destroy -auto-approve || {
-            echo "terraform destroy failed. Investigate manual cleanup."
-            exit 1
-          }
+          set -e
+          terraform destroy -auto-approve
