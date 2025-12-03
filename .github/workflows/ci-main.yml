@@ -117,7 +117,7 @@ jobs:
     name: Terraform Destroy (runs only if terraform apply failed)
     needs: terraform-apply
     runs-on: ubuntu-latest
-    if: needs.terraform-apply.outputs.apply_status == 'failure'
+    if: needs.terraform-apply.result == 'failure'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
