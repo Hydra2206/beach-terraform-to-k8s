@@ -6,18 +6,6 @@ resource "aws_s3_bucket" "mittu-bkt" {
   }
 }
 
-resource "aws_s3_object" "photo-1" {
-  bucket = aws_s3_bucket.mittu-bkt.bucket
-  key    = "photos/beach.png"
-  source = "D:/beach-terraform-to-k8s/terraform/beach.png"
-}
-
-resource "aws_s3_object" "photo-2" {
-  bucket = aws_s3_bucket.mittu-bkt.bucket
-  key    = "photos/bitch.png"
-  source = "D:beach-terraform-to-k8s/terraform/bitch.png"
-}
-
 #created for public access
 resource "aws_s3_bucket_public_access_block" "pen" {
   bucket = aws_s3_bucket.mittu-bkt.id
