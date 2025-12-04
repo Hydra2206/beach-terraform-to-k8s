@@ -16,5 +16,9 @@ Solution -> Jitne bhi variables hai tf code me un sabko AWS secrets manager me s
             ci-main.yml workflow me ek stage add kiya hu joh ki yeh ensure karega ki jab bhi terraform apply stage fail hojayega tab terraform destroy stage run hoga joh ki woh resources ko delete kar dengi joh apply ke time pura create nahi ho payi thi
             oidc-iam-role me full Administrator access de diya yeh github action ko allow kar raha hai aws me resource create karne ke liye through oidc
 
-tommorow task 4/12 last workflow run check karna usme s3 object upload kar rahe hai woh error aara hai, usko resolve karna hai
+(TASK FOR -> 4/12/2025) last workflow run check karna usme s3 object upload kar rahe hai woh error aara hai, usko resolve karna hai (resolved - Changed some commands to upload file in instances)
+
+3/12/2025 - Ci-main workflow me Terraform apply job success hogya, 
+            Now getting some errors in Build & deploy stage    /app - not found -? Created app folder in repo & copied Dockerfile, django file required for build process along with K8(deployment + service yaml) file.
+            
             
