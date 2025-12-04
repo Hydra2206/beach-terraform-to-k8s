@@ -2,7 +2,6 @@
 sudo apt update
 sudo apt install -y apache2
 
-sudo snap install aws-cli --classic
 sudo curl -s -o /var/www/html/beach.png https://raw.githubusercontent.com/Hydra2206/beach-terraform-to-k8s/main/terraform/beach.png
 
 sudo tee /var/www/html/index.html <<EOF
