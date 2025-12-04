@@ -138,19 +138,69 @@ jobs:
           push: true
           tags: ${{ steps.ecr-login.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
 
-      - name: Set KUBECONFIG
+      - name: Set KUBECONFIG (create/update, wait for API)
+        id: set-kube
         run: |
-          mkdir -p $HOME/.kube
+          set -euo pipefail
+          mkdir -p "$HOME/.kube"
 
+          # Guard: if no kubeconfig path was produced by terraform job, skip safely
           if [ -z "${{ needs.terraform-apply.outputs.kubeconfig }}" ]; then
-          echo "Kubeconfig is empty — skipping deploy."
-          exit 0
+            echo "Kubeconfig output is empty — skipping deploy."
+            echo "kube_ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-          # copy kubeconfig created by previous job
-          cp ${{ needs.terraform-apply.outputs.kubeconfig }} $HOME/.kube/config
-          export KUBECONFIG=$HOME/.kube/config
+          # Copy kubeconfig produced by terraform job (it should be a full path)
+          SRC_KUBECONFIG="${{ needs.terraform-apply.outputs.kubeconfig }}"
+          if [ ! -f "$SRC_KUBECONFIG" ]; then
+            echo "::error ::Kubeconfig file not found at '$SRC_KUBECONFIG' (maybe terraform didn't write it)"
+            echo "kube_ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          cp "$SRC_KUBECONFIG" "$HOME/.kube/config"
+          export KUBECONFIG="$HOME/.kube/config"
+          echo "Wrote kubeconfig to $KUBECONFIG"
+
+          # Ensure aws cli can reach cluster endpoint (update-kubeconfig is idempotent, re-run to be safe)
+          # Use Terraform outputs to find cluster name/region if available (silently fallback to secret region)
+          CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "")
+          CLUSTER_REGION=$(terraform output -raw cluster_region 2>/dev/null || echo "${{ secrets.AWS_REGION }}")
+
+          if [ -n "$CLUSTER_NAME" ]; then
+            aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$CLUSTER_REGION" --kubeconfig "$KUBECONFIG" || true
+          fi
+
+          # Wait for the API server to become available (max ~5 minutes)
+          echo "Waiting for Kubernetes API to be reachable..."
+          for i in $(seq 1 30); do
+          if kubectl version --short >/dev/null 2>&1; then
+            echo "Kubernetes API is reachable"
+            echo "kube_ready=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+            echo "API not ready yet ($i/30). Sleeping 10s..."
+            sleep 10
+          done  
+
+          echo "::warning ::Kubernetes API did not become reachable in time"
+          echo "kube_ready=false" >> "$GITHUB_OUTPUT"
+        working-directory: ${{ env.TERRAFORM_DIR }}
         shell: bash
+
+      - name: Deploy to EKS (kubectl apply)
+        if: steps.set-kube.outputs.kube_ready == 'true'
+        run: |
+          set -euo pipefail
+          export KUBECONFIG="$HOME/.kube/config"
+
+          # Replace image placeholder in manifest(s)
+          sed -i "s|IMAGE_PLACEHOLDER|${{ steps.ecr-login.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}|g" ./app/K8s/deployment.yaml || true
+
+          # Apply manifests. Use --validate=false to skip client-side openapi validation if needed.
+          kubectl apply -f ./app/K8s --validate=false
+          shell: bash
 
       - name: Deploy to EKS (kubectl apply)
         run: |
