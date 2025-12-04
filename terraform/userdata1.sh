@@ -3,7 +3,7 @@ sudo apt update
 sudo apt install -y apache2
 
 sudo snap install aws-cli --classic
-  sudo aws s3 cp s3://terraform-project-s3bkt/photos/bitch.png /var/www/html/bitch.png
+sudo curl -s -o /var/www/html/bitch.png https://raw.githubusercontent.com/Hydra2206/beach-terraform-to-k8s/main/terraform/bitch.png
 
 sudo tee /var/www/html/index.html <<EOF
 <!DOCTYPE html>
