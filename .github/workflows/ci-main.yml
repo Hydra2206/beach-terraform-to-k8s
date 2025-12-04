@@ -155,8 +155,8 @@ jobs:
       - name: Deploy to EKS (kubectl apply)
         run: |
           # Replace image reference in deployment manifest or use `kubectl set image`
-          sed -i "s|IMAGE_PLACEHOLDER|${{ steps.ecr-login.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}|g" ./app/k8s/deployment.yaml
-          kubectl apply -f ./app/k8s
+          sed -i "s|IMAGE_PLACEHOLDER|${{ steps.ecr-login.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}|g" ./app/K8s/deployment.yaml
+          kubectl apply -f ./app/K8s
 
   destroy-on-failure:
     name: Terraform Destroy (runs only if terraform apply failed)
