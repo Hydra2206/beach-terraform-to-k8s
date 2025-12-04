@@ -149,6 +149,12 @@ jobs:
       - name: Set KUBECONFIG
         run: |
           mkdir -p $HOME/.kube
+
+          if [ -z "${{ needs.terraform-apply.outputs.kubeconfig }}" ]; then
+          echo "Kubeconfig is empty — skipping deploy."
+          exit 0
+          fi
+          
           # copy kubeconfig created by previous job
           cp ${{ needs.terraform-apply.outputs.kubeconfig }} $HOME/.kube/config
           export KUBECONFIG=$HOME/.kube/config
