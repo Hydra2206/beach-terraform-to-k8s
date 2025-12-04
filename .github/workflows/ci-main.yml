@@ -121,6 +121,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Debug repo layout
+        run: |
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          pwd
+          ls -la
+          echo "Check ./app"
+          if [ -d "./app" ]; then ls -la ./app; else echo "NO ./app folder"; fi
+
       - name: Configure AWS credentials to push to ECR
         uses: aws-actions/configure-aws-credentials@v2
         with:
