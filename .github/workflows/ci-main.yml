@@ -90,17 +90,17 @@ jobs:
       - name: Generate kubeconfig
         working-directory: ${{ env.TERRAFORM_DIR }}
         run: |
-          mkdir -p $GITHUB_WORKSPACE/.kube
+          mkdir -p .kube
           aws eks update-kubeconfig \
             --name "${{ secrets.CLUSTER_NAME }}" \
             --region "${{ secrets.AWS_REGION }}" \
-            --kubeconfig $GITHUB_WORKSPACE/.kube/config
+            --kubeconfig .kube/config
       
       - name: Upload kubeconfig
         uses: actions/upload-artifact@v4
         with:
           name: kubeconfig
-          path: $GITHUB_WORKSPACE/.kube/config
+          path: ./.kube/config
 
   build-and-deploy:
     name: Build & Deploy (runs only if terraform apply succeeded)
@@ -126,12 +126,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: kubeconfig
-          path: $HOME/.kube
+          path: ./.kube
 
       - name: Export kubeconfig
         run: |
-          echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV  
-
+          echo "KUBECONFIG=$GITHUB_WORKSPACE/.kube/config" >> $GITHUB_ENV
 
       - name: Deploy to EKS
         run: |
