@@ -3,10 +3,12 @@ apiVersion: v1
 kind: Service
 metadata:
   name: django-service
+  labels:
+    app: django
 spec:
   type: LoadBalancer
   selector:
-    app: my-django-app
+    app: django
   ports:
     - protocol: TCP
       port: 80
