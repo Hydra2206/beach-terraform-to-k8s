@@ -18,7 +18,10 @@ Solution -> Jitne bhi variables hai tf code me un sabko AWS secrets manager me s
 
 (TASK FOR -> 4/12/2025) last workflow run check karna usme s3 object upload kar rahe hai woh error aara hai, usko resolve karna hai (resolved - Changed some commands to upload file in instances)
 
-3/12/2025 - Ci-main workflow me Terraform apply job success hogya, 
+4/12/2025 - Ci-main workflow me Terraform apply job success hogya, 
             Now getting some errors in Build & deploy stage    /app - not found -? Created app folder in repo & copied Dockerfile, django file required for build process along with K8(deployment + service yaml) file.
+            Getting some Kubeconfig related error (Resolved)
+
+5/12/2025 - Getting error Unable to validate Deployment & service yaml file: failed to download openapi: Get "http://localhost:8080/openapi/v2?timeout=32s" (In Progress)
             
             
