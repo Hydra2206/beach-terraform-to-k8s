@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
       - name: my-django-app
-        image: mittu7/my_app_django:v1.0.1
+        image: IMAGE_PLACEHOLDER  # GitHub Actions replaces this
         ports:
         - containerPort: 8000
