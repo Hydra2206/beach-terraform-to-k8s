@@ -87,6 +87,33 @@ jobs:
           fi
           # Keep the step itself exit 0 so job completes and outputs are visible
           exit 0
+      
+      - name: Export terraform outputs (job outputs + artifact)
+        id: export-tf
+        working-directory: ./terraform
+        run: |
+          set -euo pipefail
+
+          # Write tf outputs to JSON (safe backup)
+          terraform output -json > tf-outputs.json || true
+
+          # Read cluster outputs (raw) - fall back to empty string if missing
+          CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "")
+          CLUSTER_REGION=$(terraform output -raw cluster_region 2>/dev/null || echo "${{ secrets.AWS_REGION }}")
+
+          # Print for logs (non-sensitive)
+          echo "Terraform cluster_name='$CLUSTER_NAME'"
+          echo "Terraform cluster_region='$CLUSTER_REGION'"
+
+          # Export small values as job outputs for downstream jobs
+          echo "cluster_name=${CLUSTER_NAME}" >> "$GITHUB_OUTPUT"
+          echo "cluster_region=${CLUSTER_REGION}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload terraform outputs artifact (optional, for debugging)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tf-outputs
+          path: ./terraform/tf-outputs.json
 
       - name: Output kubeconfig to file (if apply succeeded)
         id: write-kubeconfig
@@ -138,16 +165,17 @@ jobs:
           mkdir -p "$HOME/.kube"
           export KUBECONFIG="$HOME/.kube/config"
 
-          # Get cluster name/region from terraform outputs (run in terraform dir)
-          cd ./terraform
-          CLUSTER_NAME="$(terraform output -raw cluster_name 2>/dev/null || true)"
-          CLUSTER_REGION="$(terraform output -raw cluster_region 2>/dev/null || echo '${{ secrets.AWS_REGION }}')"
+          # Read cluster name + region from terraform-apply job outputs
+          CLUSTER_NAME="${{ needs.terraform-apply.outputs.cluster_name }}"
+          CLUSTER_REGION="${{ needs.terraform-apply.outputs.cluster_region }}"
 
           if [ -z "$CLUSTER_NAME" ]; then
             echo "::error ::terraform output 'cluster_name' not found. Aborting deploy."
             echo "kube_ready=false" >> "$GITHUB_OUTPUT"
             exit 1
           fi
+
+          echo "Using cluster: $CLUSTER_NAME (region: ${CLUSTER_REGION:-${{ secrets.AWS_REGION }}})"
 
           # Generate kubeconfig using AWS CLI (idempotent)
           aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$CLUSTER_REGION" --kubeconfig "$KUBECONFIG" || true

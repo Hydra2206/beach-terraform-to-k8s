@@ -1,4 +1,4 @@
-/*
+
 output "alb-dns" {
   value = module.alb.alb_dns
 }
@@ -10,7 +10,6 @@ output "public_ip_1" {
 output "public_ip_2" {
   value = module.ec2.public_ip_2
 }
-*/
 
 
 output "cluster_name" {
@@ -24,4 +23,9 @@ output "cluster_certificate_authority" {
 }
 output "node_role_arn" {
   value = aws_iam_role.node_group_role.arn
+}
+
+output "cluster_region" {
+  description = "Region of the EKS cluster"
+  value       = var.region
 }
