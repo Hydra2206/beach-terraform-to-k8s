@@ -103,7 +103,6 @@ jobs:
         with:
           name: kubeconfig
           path: $GITHUB_WORKSPACE/.kube/config
-      
         working-directory: ${{ env.TERRAFORM_DIR }}
 
   build-and-deploy:
