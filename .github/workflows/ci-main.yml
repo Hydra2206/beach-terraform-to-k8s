@@ -92,6 +92,7 @@ jobs:
         run: |
           mkdir -p $GITHUB_WORKSPACE/.kube
           CLUSTER_NAME=$(terraform output -raw cluster_name)
+          echo "Using cluster name: $CLUSTER_NAME"
           aws eks update-kubeconfig \
             --name "$CLUSTER_NAME" \
             --region "${{ secrets.AWS_REGION }}" \
