@@ -90,11 +90,16 @@ jobs:
       - name: Generate kubeconfig
         working-directory: ${{ env.TERRAFORM_DIR }}
         run: |
-          mkdir -p .kube
+          mkdir -p "$GITHUB_WORKSPACE/.kube"
           aws eks update-kubeconfig \
             --name "${{ secrets.CLUSTER_NAME }}" \
             --region "${{ secrets.AWS_REGION }}" \
-            --kubeconfig .kube/config
+            --kubeconfig "$GITHUB_WORKSPACE/.kube/config"
+
+      - name: Debug kubeconfig path
+        run: |
+          pwd
+          ls -R .
       
       - name: Upload kubeconfig
         uses: actions/upload-artifact@v4
