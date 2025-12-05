@@ -160,6 +160,13 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v1
 
+      - name: Download tf-outputs artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tf-outputs
+          path: ./tf_outputs  
+
+
       - name: Prepare kubeconfig from cluster outputs and wait for API
         id: prepare-kube
         run: |
@@ -191,17 +198,7 @@ jobs:
             # but in GitHub Actions it is available as an action. We'll call the action below.
             echo "Proceeding..."
           fi
-
         shell: bash
-
-      # Follow with a separate step that actually downloads and parses the artifact,
-      # because actions/download-artifact is an action, not a shell command.
-      - name: Download tf-outputs artifact (fallback)
-        if: steps.prepare-kube.outcome == 'success' || always()
-        uses: actions/download-artifact@v4
-        with:
-          name: tf-outputs
-          path: ./tf_outputs
 
       - name: Parse tf-outputs.json and set cluster variables (fallback)
         if: ${{ always() }}
@@ -209,24 +206,26 @@ jobs:
         run: |
           set -euo pipefail
           TF_JSON="./tf_outputs/tf-outputs.json"
-          if [ -f "$TF_JSON" ]; then
-            echo "Found tf-outputs.json, parsing..."
-            echo "DEBUG: tf-outputs.json content:"
-            cat "$TF_JSON"
 
-            CLUSTER_NAME_FROM_ARTIFACT=$(jq -r '.cluster_name.value // empty' "$TF_JSON" 2>/dev/null || echo "")
-            CLUSTER_REGION_FROM_ARTIFACT=$(jq -r '.cluster_region.value // empty' "$TF_JSON" 2>/dev/null || echo "")
-
-            echo "DEBUG: cluster_name_from_artifact='$CLUSTER_NAME_FROM_ARTIFACT'"
-            echo "DEBUG: cluster_region_from_artifact='$CLUSTER_REGION_FROM_ARTIFACT'"
-
-            echo "cluster_name_from_artifact=$CLUSTER_NAME_FROM_ARTIFACT" >> "$GITHUB_OUTPUT"
-            echo "cluster_region_from_artifact=$CLUSTER_REGION_FROM_ARTIFACT" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning ::tf-outputs.json artifact not found at $TF_JSON"
-            echo "cluster_name_from_artifact=" >> "$GITHUB_OUTPUT"
-            echo "cluster_region_from_artifact=" >> "$GITHUB_OUTPUT"
+          if [ ! -f "$TF_JSON" ]; then
+            echo "::error ::tf-outputs.json artifact not found at $TF_JSON"
+            echo "cluster_name=" >> "$GITHUB_OUTPUT"
+            echo "cluster_region=" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
+
+          echo "DEBUG: tf-outputs.json content:"
+          cat "$TF_JSON"
+
+          # NOTE: your JSON shape is: .cluster_name.value and .cluster_region.value
+          CLUSTER_NAME_FROM_ARTIFACT=$(jq -r '.cluster_name.value // empty' "$TF_JSON" 2>/dev/null || echo "")
+          CLUSTER_REGION_FROM_ARTIFACT=$(jq -r '.cluster_region.value // empty' "$TF_JSON" 2>/dev/null || echo "")
+
+          echo "DEBUG: CLUSTER_NAME_FROM_ARTIFACT='$CLUSTER_NAME_FROM_ARTIFACT'"
+          echo "DEBUG: CLUSTER_REGION_FROM_ARTIFACT='$CLUSTER_REGION_FROM_ARTIFACT'"
+
+          echo "cluster_name=$CLUSTER_NAME_FROM_ARTIFACT" >> "$GITHUB_OUTPUT"
+          echo "cluster_region=$CLUSTER_REGION_FROM_ARTIFACT" >> "$GITHUB_OUTPUT"
         shell: bash
 
       # Now a step that finalizes values (prefer job outputs, else artifact values)
