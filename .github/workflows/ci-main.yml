@@ -19,10 +19,10 @@ jobs:
     name: Terraform Apply (plan + apply) — emits apply_status output
     runs-on: ubuntu-latest
     outputs:
-      apply_status: ${{ steps.tf_apply.outputs.apply_status }}
-      kubeconfig: ${{ steps.write-kubeconfig.outputs.kubeconfig-path }}
-      cluster_name: ${{ steps.export-tf.outputs.cluster_name }}
-      cluster_region: ${{ steps.export-tf.outputs.cluster_region }}
+    apply_status: ${{ steps.tf_apply.outputs.apply_status }}
+    kubeconfig: ${{ steps.write-kubeconfig.outputs.kubeconfig-path }}
+    cluster_name: ${{ steps.export-tf.outputs.cluster_name }}
+    cluster_region: ${{ steps.export-tf.outputs.cluster_region }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,10 +38,6 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Show runner path (debug)
-        run: |
-          echo "Working dir: $(pwd)"
-          ls -la
 
       - name: Fetch Terraform vars from AWS Secrets Manager
         id: fetch_secret
@@ -89,55 +85,23 @@ jobs:
           fi
           # Keep the step itself exit 0 so job completes and outputs are visible
           exit 0
-      
-      - name: Export terraform outputs (job outputs + artifact)
-        id: export-tf
-        working-directory: ./terraform
+      - name: Generate kubeconfig
+        working-directory: ${{ env.TERRAFORM_DIR }}
         run: |
-          set -euo pipefail
-
-          # Write tf outputs to JSON (safe backup)
-          terraform output -json > tf-outputs.json || true
-
-          # Read cluster outputs (raw) - fall back to empty string if missing
-          CLUSTER_NAME=$(jq -r '.cluster_name.value // empty' tf-outputs.json 2>/dev/null || echo "")
-          CLUSTER_REGION=$(jq -r '.cluster_region.value // empty' tf-outputs.json 2>/dev/null || echo "")
-
-          # Print for logs (non-sensitive)
-          echo "Terraform cluster_name='$CLUSTER_NAME'"
-          echo "Terraform cluster_region='$CLUSTER_REGION'"
-
-          # Export small values as job outputs for downstream jobs
-          echo "cluster_name=${CLUSTER_NAME}" >> "$GITHUB_OUTPUT"
-          echo "cluster_region=${CLUSTER_REGION}" >> "$GITHUB_OUTPUT"
-
-      - name: Upload terraform outputs artifact (optional, for debugging)
+          mkdir -p $GITHUB_WORKSPACE/.kube
+          CLUSTER_NAME=$(terraform output -raw cluster_name)
+          CLUSTER_REGION=$(terraform output -raw cluster_region)
+          aws eks update-kubeconfig \
+            --name "$CLUSTER_NAME" \
+            --region "$CLUSTER_REGION" \
+            --kubeconfig $GITHUB_WORKSPACE/.kube/config
+      
+      - name: Upload kubeconfig
         uses: actions/upload-artifact@v4
         with:
-          name: tf-outputs
-          path: ./terraform/tf-outputs.json
+          name: kubeconfig
+          path: $GITHUB_WORKSPACE/.kube/config
 
-      - name: Output kubeconfig to file (if apply succeeded)
-        id: write-kubeconfig
-        run: |
-          # Default to empty kubeconfig output
-          echo "kubeconfig-path=" >> "$GITHUB_OUTPUT"
-
-          if [ "${{ steps.tf_apply.outputs.apply_status }}" = "success" ]; then
-            mkdir -p $GITHUB_WORKSPACE/.kube
-            # If terraform outputs are present, update kubeconfig
-            # Silence errors so we still set an output (if missing, remains blank)
-            set +e
-            CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "")
-            CLUSTER_REGION=$(terraform output -raw cluster_region 2>/dev/null || echo "${{ secrets.AWS_REGION }}")
-            if [ -n "$CLUSTER_NAME" ]; then
-              aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$CLUSTER_REGION" --kubeconfig $GITHUB_WORKSPACE/.kube/config 2>/dev/null || true
-              if [ -f $GITHUB_WORKSPACE/.kube/config ]; then
-                echo "kubeconfig-path=$GITHUB_WORKSPACE/.kube/config" >> "$GITHUB_OUTPUT"
-              fi
-            fi
-            set -e
-          fi
         working-directory: ${{ env.TERRAFORM_DIR }}
 
   build-and-deploy:
@@ -160,133 +124,20 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Download tf-outputs artifact
+      - name: Download kubeconfig
         uses: actions/download-artifact@v4
         with:
-          name: tf-outputs
-          path: ./tf_outputs  
+          name: kubeconfig
+          path: $HOME/.kube
 
-
-      - name: Prepare kubeconfig from cluster outputs and wait for API
-        id: prepare-kube
+      - name: Export kubeconfig
         run: |
-          set -euo pipefail
-          mkdir -p "$HOME/.kube"
-          export KUBECONFIG="$HOME/.kube/config"
+          echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV  
 
-          # 1) Try job output first (this is the fastest path if export worked)
-          CLUSTER_NAME="${{ needs.terraform-apply.outputs.cluster_name }}"
-          CLUSTER_REGION="${{ needs.terraform-apply.outputs.cluster_region }}"
 
-          echo "Debug: cluster_name from needs outputs: '${CLUSTER_NAME:-}'"
-          echo "Debug: cluster_region from needs outputs: '${CLUSTER_REGION:-}'"
-
-          # 2) If empty, download artifact tf-outputs and parse tf-outputs.json
-          if [ -z "$CLUSTER_NAME" ]; then
-            echo "Cluster name not present in job outputs — attempting to download tf-outputs artifact..."
-            mkdir -p ./tf_outputs
-            # Try to download artifact created by terraform-apply job
-            # If the artifact name differs, change 'tf-outputs' to the name you uploaded.
-            if ! gh --version >/dev/null 2>&1; then
-              # ensure github CLI isn't required; use actions/download-artifact instead
-                echo "Using actions/download-artifact approach..."
-              # The workflow must include actions/download-artifact step — use CLI fallback
-            fi
-
-            # Use actions/download-artifact (this step runs inside the job)
-            # If actions/download-artifact isn't available in this runner, this command will fail,
-            # but in GitHub Actions it is available as an action. We'll call the action below.
-            echo "Proceeding..."
-          fi
-        shell: bash
-
-      - name: Parse tf-outputs.json and set cluster variables (fallback)
-        if: ${{ always() }}
-        id: parse-outputs
+      - name: Deploy to EKS
         run: |
-          set -euo pipefail
-          TF_JSON="./tf_outputs/tf-outputs.json"
-
-          if [ ! -f "$TF_JSON" ]; then
-            echo "::error ::tf-outputs.json artifact not found at $TF_JSON"
-            echo "cluster_name=" >> "$GITHUB_OUTPUT"
-            echo "cluster_region=" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          echo "DEBUG: tf-outputs.json content:"
-          cat "$TF_JSON"
-
-          # NOTE: your JSON shape is: .cluster_name.value and .cluster_region.value
-          CLUSTER_NAME_FROM_ARTIFACT=$(jq -r '.cluster_name.value // empty' "$TF_JSON" 2>/dev/null || echo "")
-          CLUSTER_REGION_FROM_ARTIFACT=$(jq -r '.cluster_region.value // empty' "$TF_JSON" 2>/dev/null || echo "")
-
-          echo "DEBUG: CLUSTER_NAME_FROM_ARTIFACT='$CLUSTER_NAME_FROM_ARTIFACT'"
-          echo "DEBUG: CLUSTER_REGION_FROM_ARTIFACT='$CLUSTER_REGION_FROM_ARTIFACT'"
-
-          echo "cluster_name=$CLUSTER_NAME_FROM_ARTIFACT" >> "$GITHUB_OUTPUT"
-          echo "cluster_region=$CLUSTER_REGION_FROM_ARTIFACT" >> "$GITHUB_OUTPUT"
-        shell: bash
-
-      # Now a step that finalizes values (prefer job outputs, else artifact values)
-      - name: Finalize cluster name/region and create kubeconfig
-        id: finalize-kube
-        run: |
-          set -euo pipefail
-          mkdir -p "$HOME/.kube"
-          export KUBECONFIG="$HOME/.kube/config"
-
-          # prefer needs outputs; otherwise pick artifact-parsed outputs
-          CLUSTER_NAME="${{ steps.parse-outputs.outputs.cluster_name_from_artifact }}"
-          CLUSTER_REGION="${{ steps.parse-outputs.outputs.cluster_region_from_artifact }}"
-
-          echo "Debug: CLUSTER_NAME from parse-outputs='${CLUSTER_NAME}'"
-          echo "Debug: CLUSTER_REGION from parse-outputs='${CLUSTER_REGION}'"
-
-          echo "Final cluster_name='$CLUSTER_NAME'"
-          echo "Final cluster_region='${CLUSTER_REGION:-${{ secrets.AWS_REGION }}}'"
-
-          if [ -z "$CLUSTER_NAME" ]; then
-            echo "::error ::No cluster_name available from job outputs or artifact. Aborting deploy."
-            echo "kube_ready=false" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          # Generate kubeconfig using AWS CLI (idempotent)
-          aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "${CLUSTER_REGION:-${{ secrets.AWS_REGION }}}" --kubeconfig "$KUBECONFIG" || true
-          echo "Wrote kubeconfig to $KUBECONFIG"
-
-          # Wait for API server to become available (max ~5 minutes)
-          echo "Waiting for Kubernetes API..."
-          for i in $(seq 1 30); do
-            if kubectl --kubeconfig="$KUBECONFIG" version --short >/dev/null 2>&1; then
-              echo "Kubernetes API reachable"
-              echo "kube_ready=true" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            echo "API not ready ($i/30). Sleeping 10s..."
-            sleep 10
-          done
-
-          echo "::warning ::Kubernetes API did not become reachable in time"
-          echo "kube_ready=false" >> "$GITHUB_OUTPUT"
-        shell: bash
-
-      - name: Set KUBECONFIG env
-        if: steps.finalize-kube.outputs.kube_ready == 'true'
-        run: |
-          echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
-
-      - name: Replace image and Deploy to EKS
-        if:  steps.finalize-kube.outputs.kube_ready == 'true'
-        run: |
-          set -euo pipefail
-          export KUBECONFIG=$HOME/.kube/config
-          # Replace image placeholder in deployment manifest(s)
-          sed -i "s|IMAGE_PLACEHOLDER|${{ steps.ecr-login.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}|g" ./app/K8s/deployment.yaml || true
-          # Apply manifests; --validate=false avoids the openapi error if schema not available, but if API is reachable it will proceed.
-          kubectl apply -f ./app/K8s --validate=false
-        shell: bash
+          kubectl apply -f ./app/K8s
 
   destroy-on-failure:
     name: Terraform Destroy (runs only if terraform apply failed)
