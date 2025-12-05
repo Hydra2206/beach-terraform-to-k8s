@@ -22,6 +22,11 @@ Solution -> Jitne bhi variables hai tf code me un sabko AWS secrets manager me s
             Now getting some errors in Build & deploy stage    /app - not found -? Created app folder in repo & copied Dockerfile, django file required for build process along with K8(deployment + service yaml) file.
             Getting some Kubeconfig related error (Resolved)
 
-5/12/2025 - Getting error Unable to validate Deployment & service yaml file: failed to download openapi: Get "http://localhost:8080/openapi/v2?timeout=32s" (In Progress)
+5/12/2025 - Getting error Unable to validate Deployment & service yaml file: failed to download openapi: Get "http://localhost:8080/openapi/v2?timeout=32s" (Bypass this issue with lots of code changes in ci-main workflow)
+            ci-main workfow me bahut sare complex chije add kar diya with time while debugging aaj sab ko remove karke workflow ko ekdum simple kardiya & ci-main workflow got success run.
+
+(TASK FOR -> 6/12/2025) ci-main workflow toh success hogya but ouput me kya milega usko pata lagana hai, koi app run hoga website. what is the overall purpose of this project?
+                        maybe 2-3 workflow create hua in this project line-by-line pura workflow samajhna hai & terraform code me bhi bahut sare chij new resource add kiya use bhi review karna hai
+            
             
             
