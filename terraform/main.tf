@@ -151,7 +151,7 @@ resource "aws_iam_role_policy_attachment" "node_attach_ecr" {
 resource "aws_eks_cluster" "cluster" {
   name     = var.cluster_name
   role_arn = aws_iam_role.eks_cluster_role.arn
-  version  = "1.32" # pick a K8s version; update as desired
+  version  = "1.33" # pick a K8s version; update as desired
 
   vpc_config {
     subnet_ids              = concat(module.vpc.public_subnets, module.vpc.private_subnets)
@@ -176,7 +176,7 @@ resource "aws_eks_node_group" "workers" {
   }
 
   instance_types = ["t3.micro"]
-  ami_type       = "AL2_x86_64"
+  ami_type       = "AL2023_x86_64_STANDARD"
 
   # Optional tags, labels, remote access, etc.
   labels = { role = "worker" }
