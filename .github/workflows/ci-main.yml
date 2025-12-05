@@ -165,23 +165,96 @@ jobs:
           mkdir -p "$HOME/.kube"
           export KUBECONFIG="$HOME/.kube/config"
 
-          # Read cluster name + region from terraform-apply job outputs
+          # 1) Try job output first (this is the fastest path if export worked)
           CLUSTER_NAME="${{ needs.terraform-apply.outputs.cluster_name }}"
           CLUSTER_REGION="${{ needs.terraform-apply.outputs.cluster_region }}"
 
+          echo "Debug: cluster_name from needs outputs: '${CLUSTER_NAME:-}'"
+          echo "Debug: cluster_region from needs outputs: '${CLUSTER_REGION:-}'"
+
+          # 2) If empty, download artifact tf-outputs and parse tf-outputs.json
           if [ -z "$CLUSTER_NAME" ]; then
-            echo "::error ::terraform output 'cluster_name' not found. Aborting deploy."
+            echo "Cluster name not present in job outputs — attempting to download tf-outputs artifact..."
+            mkdir -p ./tf_outputs
+            # Try to download artifact created by terraform-apply job
+            # If the artifact name differs, change 'tf-outputs' to the name you uploaded.
+            if ! gh --version >/dev/null 2>&1; then
+              # ensure github CLI isn't required; use actions/download-artifact instead
+                echo "Using actions/download-artifact approach..."
+              # The workflow must include actions/download-artifact step — use CLI fallback
+            fi
+
+            # Use actions/download-artifact (this step runs inside the job)
+            # If actions/download-artifact isn't available in this runner, this command will fail,
+            # but in GitHub Actions it is available as an action. We'll call the action below.
+            echo "Proceeding..."
+          fi
+
+        shell: bash
+
+      # Follow with a separate step that actually downloads and parses the artifact,
+      # because actions/download-artifact is an action, not a shell command.
+      - name: Download tf-outputs artifact (fallback)
+        if: steps.prepare-kube.outcome == 'success' || always()
+        uses: actions/download-artifact@v4
+        with:
+          name: tf-outputs
+          path: ./tf_outputs
+
+      - name: Parse tf-outputs.json and set cluster variables (fallback)
+        if: ${{ (needs.terraform-apply.outputs.cluster_name == '') || (needs.terraform-apply.outputs.cluster_region == '') }}
+        id: parse-outputs
+        run: |
+          set -euo pipefail
+          TF_JSON="./tf_outputs/tf-outputs.json"
+          if [ -f "$TF_JSON" ]; then
+            echo "Found tf-outputs.json, parsing..."
+            CLUSTER_NAME_FROM_ARTIFACT=$(jq -r '.cluster_name.value // empty' "$TF_JSON" 2>/dev/null || echo "")
+            CLUSTER_REGION_FROM_ARTIFACT=$(jq -r '.cluster_region.value // empty' "$TF_JSON" 2>/dev/null || echo "")
+            echo "cluster_name_from_artifact=$CLUSTER_NAME_FROM_ARTIFACT" >> "$GITHUB_OUTPUT"
+            echo "cluster_region_from_artifact=$CLUSTER_REGION_FROM_ARTIFACT" >> "$GITHUB_OUTPUT"
+            echo "Parsed cluster_name_from_artifact='$CLUSTER_NAME_FROM_ARTIFACT'"
+          else
+            echo "::warning ::tf-outputs.json artifact not found at $TF_JSON"
+            echo "cluster_name_from_artifact=" >> "$GITHUB_OUTPUT"
+            echo "cluster_region_from_artifact=" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
+      # Now a step that finalizes values (prefer job outputs, else artifact values)
+      - name: Finalize cluster name/region and create kubeconfig
+        id: finalize-kube
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.kube"
+          export KUBECONFIG="$HOME/.kube/config"
+
+          # prefer needs outputs; otherwise pick artifact-parsed outputs
+          CLUSTER_NAME="${{ needs.terraform-apply.outputs.cluster_name }}"
+          CLUSTER_REGION="${{ needs.terraform-apply.outputs.cluster_region }}"
+
+          # fallback to artifact outputs if primary is empty
+          if [ -z "$CLUSTER_NAME" ]; then
+            CLUSTER_NAME="${{ steps.parse-outputs.outputs.cluster_name_from_artifact }}"
+          fi
+          if [ -z "$CLUSTER_REGION" ]; then
+            CLUSTER_REGION="${{ steps.parse-outputs.outputs.cluster_region_from_artifact }}"
+          fi
+
+          echo "Final cluster_name='$CLUSTER_NAME'"
+          echo "Final cluster_region='${CLUSTER_REGION:-${{ secrets.AWS_REGION }}}'"
+
+          if [ -z "$CLUSTER_NAME" ]; then
+            echo "::error ::No cluster_name available from job outputs or artifact. Aborting deploy."
             echo "kube_ready=false" >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
-          echo "Using cluster: $CLUSTER_NAME (region: ${CLUSTER_REGION:-${{ secrets.AWS_REGION }}})"
-
           # Generate kubeconfig using AWS CLI (idempotent)
-          aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$CLUSTER_REGION" --kubeconfig "$KUBECONFIG" || true
+          aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "${CLUSTER_REGION:-${{ secrets.AWS_REGION }}}" --kubeconfig "$KUBECONFIG" || true
           echo "Wrote kubeconfig to $KUBECONFIG"
 
-          # Wait for API server up to ~5 minutes
+          # Wait for API server to become available (max ~5 minutes)
           echo "Waiting for Kubernetes API..."
           for i in $(seq 1 30); do
             if kubectl --kubeconfig="$KUBECONFIG" version --short >/dev/null 2>&1; then
