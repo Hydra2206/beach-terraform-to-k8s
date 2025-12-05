@@ -98,8 +98,8 @@ jobs:
           terraform output -json > tf-outputs.json || true
 
           # Read cluster outputs (raw) - fall back to empty string if missing
-          CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "")
-          CLUSTER_REGION=$(terraform output -raw cluster_region 2>/dev/null || echo "${{ secrets.AWS_REGION }}")
+          CLUSTER_NAME=$(jq -r '.cluster_name.value // empty' tf-outputs.json 2>/dev/null || echo "")
+          CLUSTER_REGION=$(jq -r '.cluster_region.value // empty' tf-outputs.json 2>/dev/null || echo "")
 
           # Print for logs (non-sensitive)
           echo "Terraform cluster_name='$CLUSTER_NAME'"
