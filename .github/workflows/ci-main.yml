@@ -92,10 +92,9 @@ jobs:
         run: |
           mkdir -p $GITHUB_WORKSPACE/.kube
           CLUSTER_NAME=$(terraform output -raw cluster_name)
-          CLUSTER_REGION=$(terraform output -raw cluster_region)
           aws eks update-kubeconfig \
             --name "$CLUSTER_NAME" \
-            --region "$CLUSTER_REGION" \
+            --region "${{ secrets.AWS_REGION }}" \
             --kubeconfig $GITHUB_WORKSPACE/.kube/config
       
       - name: Upload kubeconfig
