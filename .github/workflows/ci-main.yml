@@ -19,10 +19,11 @@ jobs:
     name: Terraform Apply (plan + apply) — emits apply_status output
     runs-on: ubuntu-latest
     outputs:
-    apply_status: ${{ steps.tf_apply.outputs.apply_status }}
-    kubeconfig: ${{ steps.write-kubeconfig.outputs.kubeconfig-path }}
-    cluster_name: ${{ steps.export-tf.outputs.cluster_name }}
-    cluster_region: ${{ steps.export-tf.outputs.cluster_region }}
+      apply_status: ${{ steps.tf_apply.outputs.apply_status }}
+      kubeconfig: ${{ steps.write-kubeconfig.outputs.kubeconfig-path }}
+      cluster_name: ${{ steps.export-tf.outputs.cluster_name }}
+      cluster_region: ${{ steps.export-tf.outputs.cluster_region }}
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -85,6 +86,7 @@ jobs:
           fi
           # Keep the step itself exit 0 so job completes and outputs are visible
           exit 0
+      
       - name: Generate kubeconfig
         working-directory: ${{ env.TERRAFORM_DIR }}
         run: |
