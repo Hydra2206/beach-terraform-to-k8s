@@ -49,37 +49,6 @@ module "route-table" {
 }
 
 
-#created s3 bucket, policies, roles
-module "s3" {
-  source    = "./modules/s3"
-  s3_bucket = var.s3_bucket
-
-}
-
-#creating instances & sg
-module "ec2" {
-  source               = "./modules/ec2"
-  ami                  = var.ami
-  instance_type        = var.instance_type
-  key_name             = var.key_name
-  ec2_instance_profile = module.s3.aws_iam_instance_profile
-  vpc_id               = module.vpc.vpc_id
-  public_subnet_1_id   = module.subnets.public_subnet_1
-  public_subnet_2_id   = module.subnets.public_subnet_2
-
-
-}
-
-#created alb,sg,target group,listener
-module "alb" {
-  source             = "./modules/alb"
-  vpc_id             = module.vpc.vpc_id
-  instance_1_id      = module.ec2.instance_1_id
-  instance_2_id      = module.ec2.instance_2_id
-  public_subnet_1_id = module.subnets.public_subnet_1
-  public_subnet_2_id = module.subnets.public_subnet_2
-}
-
 #This is for remote backend setup & terraform state lock
 resource "aws_dynamodb_table" "terraform_lock" {
   name         = var.dynamodb_table
