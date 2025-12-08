@@ -154,12 +154,12 @@ jobs:
           IMAGE_TAG: v1
         run: |
           IMAGE_URI=${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}
-          sed -i "s|IMAGE_PLACEHOLDER|$IMAGE_URI|g" /app/K8s/deployment.yaml
+          sed -i "s|IMAGE_PLACEHOLDER|$IMAGE_URI|g" ./app/K8s/deployment.yaml
 
       - name: Deploy to EKS
         run: |
-          kubectl apply -f /app/K8s/deployment.yaml
-          kubectl apply -f /app/K8s/service.yaml
+          kubectl apply -f ./app/K8s/deployment.yaml
+          kubectl apply -f ./app/K8s/service.yaml
 
   destroy-on-failure:
     name: Terraform Destroy (runs only if terraform apply failed)
