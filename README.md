@@ -26,9 +26,10 @@ Solution -> Jitne bhi variables hai tf code me un sabko AWS secrets manager me s
             ci-main workfow me bahut sare complex chije add kar diya with time while debugging aaj sab ko remove karke workflow ko ekdum simple kardiya & ci-main workflow got success run.
 
 8/12/2025 - ci-main workflow me build-push image to ECR logic implement karra hu. Ek error tha while building image (in login to ECR stage i have used id:'ecr-login' which is wrong id should be id:'login-ecr')
+            Deploy to EKS bhi successfully implement kar diya hu, Now unable to see pods, deployment, services in eks cluster RBAC access issue need to resolve (In-progress)
 
 (IMP TASK) ci-main workflow toh success hogya but ouput me kya milega usko pata lagana hai, koi app run hoga website. what is the overall purpose of this project?
-                        maybe 2-3 workflow create hua in this project line-by-line pura workflow samajhna hai & terraform code me bhi bahut sare chij new resource add kiya use bhi review karna hai
+            maybe 2-3 workflow create hua in this project line-by-line pura workflow samajhna hai & terraform code me bhi bahut sare chij new resource add kiya use bhi review karna hai
             
             
             
