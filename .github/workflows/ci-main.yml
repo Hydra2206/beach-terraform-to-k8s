@@ -127,6 +127,12 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v1
 
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
+          docker build -t $IMAGE_URI ./app
+          docker push $IMAGE_URI
+
       - name: Download kubeconfig
         uses: actions/download-artifact@v4
         with:
