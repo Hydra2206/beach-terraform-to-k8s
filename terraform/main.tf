@@ -145,7 +145,7 @@ resource "aws_eks_node_group" "workers" {
   }
 
   instance_types = ["t3.micro"]
-  ami_type       = "AL2_x86_64"
+  ami_type       = "AL2023_x86_64_STANDARD"
 
   # Optional tags, labels, remote access, etc.
   labels = { role = "worker" }
