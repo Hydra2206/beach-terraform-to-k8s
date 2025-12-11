@@ -7,7 +7,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: read         #allows actions to read repo contents
   id-token: write
 
 env:
@@ -18,14 +18,14 @@ jobs:
   terraform-apply:
     name: Terraform Apply (plan + apply) — emits apply_status output
     runs-on: ubuntu-latest
-    outputs:
+    outputs:                  # exposes job-level outputs that other jobs can reference as needs.terraform-apply.outputs.*
       apply_status: ${{ steps.tf_apply.outputs.apply_status }}
       kubeconfig: ${{ steps.write-kubeconfig.outputs.kubeconfig-path }}
       cluster_name: ${{ steps.export-tf.outputs.cluster_name }}
       cluster_region: ${{ steps.export-tf.outputs.cluster_region }}
     
     steps:
-      - name: Checkout
+      - name: Checkout   # Downloads your repo to the runner VM.
         uses: actions/checkout@v4
 
       - name: Setup Terraform
@@ -59,22 +59,22 @@ jobs:
 
       - name: Terraform Init
         working-directory: ${{ env.TERRAFORM_DIR }}
-        run: terraform init -input=false
+        run: terraform init -input=false         #-input=false prevents interactive prompts.
 
       - name: Terraform validate
         working-directory: ${{ env.TERRAFORM_DIR }}
-        run: terraform validate || true
+        run: terraform validate || true      # || true ensures the step returns success even if terraform validate fails (so the job continues).
 
-      - name: Terraform plan (non-interactive)
+      - name: Terraform plan
         working-directory: ${{ env.TERRAFORM_DIR }}
-        run: terraform plan -out=tfplan.binary -input=false || true
+        run: terraform plan -out=tfplan.binary -input=false || true     # Creates a plan and writes it to tfplan.binary
 
       - name: Terraform Apply (auto-approve)
         id: tf_apply
         working-directory: ${{ env.TERRAFORM_DIR }}
         run: |
           # Try apply and capture result; always exit 0 so job doesn't fail early.
-          set +e
+          set +e        # disables exit-on-error so the script can inspect the return code instead of failing the step immediately.
           terraform apply -auto-approve tfplan.binary
           RC=$?
           if [ "$RC" -eq 0 ]; then
@@ -87,7 +87,7 @@ jobs:
           # Keep the step itself exit 0 so job completes and outputs are visible
           exit 0
       
-      - name: Generate kubeconfig
+      - name: Generate kubeconfig                     # you do need a kubeconfig file to interact with the cluster after it exists.
         working-directory: ${{ env.TERRAFORM_DIR }}
         run: |
           mkdir -p "$GITHUB_WORKSPACE/.kube"
@@ -101,7 +101,7 @@ jobs:
           pwd
           ls -R .
       
-      - name: Upload kubeconfig
+      - name: Upload kubeconfig           # Uploads the kubeconfig as a workflow artifact so other jobs can download it.
         uses: actions/upload-artifact@v4
         with:
           name: kubeconfig
@@ -143,7 +143,7 @@ jobs:
           name: kubeconfig
           path: ./.kube
 
-      - name: Export kubeconfig
+      - name: Export kubeconfig         # Adds KUBECONFIG environment variable to runner's environment so kubectl uses that config.
         run: |
           echo "KUBECONFIG=$GITHUB_WORKSPACE/.kube/config" >> $GITHUB_ENV
 
