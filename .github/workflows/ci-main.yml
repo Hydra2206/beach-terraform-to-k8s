@@ -160,6 +160,7 @@ jobs:
         run: |
           kubectl apply -f ./app/K8s/deployment.yaml
           kubectl apply -f ./app/K8s/service.yaml
+          kubectl apply -f ./app/K8s/rbac-issue-aws-auth-patch.yaml
 
   destroy-on-failure:
     name: Terraform Destroy (runs only if terraform apply failed)
