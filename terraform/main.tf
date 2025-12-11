@@ -172,7 +172,7 @@ resource "aws_ecr_repository" "ecr_repo" {
 }
 
 # Data for account id 
-data "aws_caller_identity" "current" {}    #it will return you AWS account_id, arn & user_id, you can also use this data source dynamically to create some resource
+data "aws_caller_identity" "current" {} #it will return you AWS account_id, arn & user_id, you can also use this data source dynamically to create some resource
 
 #this will give me oidc provider details that i've created manually
 data "aws_iam_openid_connect_provider" "github" {
@@ -180,9 +180,9 @@ data "aws_iam_openid_connect_provider" "github" {
 }
 
 #This Terraform resource creates an IAM Role specifically for GitHub Actions to deploy Terraform infrastructure to your AWS account securely using OIDC.
-resource "aws_iam_role" "github_actions_terraform_role" {          #GitHub Actions workflows can assume this role and get temporary AWS credentials to manage resources
-  name = "github-actions-terraform-role"                           # if The action comes from your specific GitHub repo
-                                                                  
+resource "aws_iam_role" "github_actions_terraform_role" { #GitHub Actions workflows can assume this role and get temporary AWS credentials to manage resources
+  name = "github-actions-terraform-role"                  # if The action comes from your specific GitHub repo
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
@@ -190,13 +190,13 @@ resource "aws_iam_role" "github_actions_terraform_role" {          #GitHub Actio
         Effect = "Allow",
         Action = "sts:AssumeRoleWithWebIdentity",
         Principal = {
-          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"       #Only the GitHub OIDC provider can assume this role
+          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com" #Only the GitHub OIDC provider can assume this role
         },
         Condition = {
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:${var.github_owner}/${var.github_repo}:ref:refs/heads/*"       #specific GitHub repo but from any branch
+            "token.actions.githubusercontent.com:sub" = "repo:${var.github_owner}/${var.github_repo}:ref:refs/heads/*" #specific GitHub repo but from any branch
           },
-           StringEquals = {
+          StringEquals = {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
         }
