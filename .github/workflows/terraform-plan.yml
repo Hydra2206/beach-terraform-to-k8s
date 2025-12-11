@@ -31,17 +31,22 @@ jobs:
           echo "Working dir: $(pwd)"
           ls -la
 
-      - name: Fetch Terraform vars
-        uses: aws-actions/aws-secretsmanager-get-secret@v1
-        id: secret
-        with:
-          secret-id: ${{ secrets.AWS_TF_VARS_SECRET_ARN }}
-          json: true
-
-      - name: Write Terraform vars
+      - name: Fetch Terraform vars from AWS Secrets Manager
+        id: fetch_secret
         run: |
+          echo "Retrieving secret from Secrets Manager..."
+          # get secret string (plain JSON). will fail the step if it cannot retrieve.
+          SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "${{ secrets.AWS_TF_VARS_SECRET_ARN }}" --query SecretString --output text)
+          if [ -z "$SECRET_JSON" ]; then
+            echo "::error ::Failed to read secret or secret is empty"
+            exit 1
+          fi
+          # mask secret to avoid leaking in logs (best-effort)
+          echo "::add-mask::$SECRET_JSON"
+          # write JSON into terraform folder as terraform.tfvars.json so Terraform auto-loads it
           mkdir -p ./terraform
-          echo "${{ steps.secret.outputs.secret }}" > ./terraform/terraform.tfvars.json
+          echo "$SECRET_JSON" > ./terraform/terraform.tfvars.json
+          echo "Wrote terraform/terraform.tfvars.json (not printed here for security)"
 
       - name: Terraform Init
         working-directory: ./terraform
