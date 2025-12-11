@@ -139,9 +139,9 @@ resource "aws_eks_node_group" "workers" {
   subnet_ids      = [module.subnets.public_subnet_1, module.subnets.public_subnet_2, module.subnets.public_subnet_3]
 
   scaling_config {
-    desired_size = 1
+    desired_size = 2
     max_size     = 2
-    min_size     = 0
+    min_size     = 1
   }
 
   instance_types = ["t3.micro"]
@@ -172,17 +172,17 @@ resource "aws_ecr_repository" "ecr_repo" {
 }
 
 # Data for account id 
-data "aws_caller_identity" "current" {}
+data "aws_caller_identity" "current" {}    #it will return you AWS account_id, arn & user_id, you can also use this data source dynamically to create some resource
 
 #this will give me oidc provider details that i've created manually
 data "aws_iam_openid_connect_provider" "github" {
-  arn = "arn:aws:iam::840026269170:oidc-provider/token.actions.githubusercontent.com"
+  arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
 }
 
-#grants permissions for Terraform to create infra (EC2/EKS/ECR/S3/IAM/etc).
-resource "aws_iam_role" "github_actions_terraform_role" {
-  name = "github-actions-terraform-role"
-
+#This Terraform resource creates an IAM Role specifically for GitHub Actions to deploy Terraform infrastructure to your AWS account securely using OIDC.
+resource "aws_iam_role" "github_actions_terraform_role" {          #GitHub Actions workflows can assume this role and get temporary AWS credentials to manage resources
+  name = "github-actions-terraform-role"                           # if The action comes from your specific GitHub repo
+                                                                  
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
@@ -190,11 +190,14 @@ resource "aws_iam_role" "github_actions_terraform_role" {
         Effect = "Allow",
         Action = "sts:AssumeRoleWithWebIdentity",
         Principal = {
-          Federated = data.aws_iam_openid_connect_provider.github.arn
+          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"       #Only the GitHub OIDC provider can assume this role
         },
         Condition = {
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:${var.github_owner}/${var.github_repo}:ref:refs/heads/*"
+            "token.actions.githubusercontent.com:sub" = "repo:${var.github_owner}/${var.github_repo}:ref:refs/heads/*"       #specific GitHub repo but from any branch
+          },
+           StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
         }
       }
@@ -244,11 +247,14 @@ resource "aws_iam_role" "github_actions_deploy_role" {
         Effect = "Allow",
         Action = "sts:AssumeRoleWithWebIdentity",
         Principal = {
-          Federated = data.aws_iam_openid_connect_provider.github.arn
+          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
         },
         Condition = {
           StringLike = {
             "token.actions.githubusercontent.com:sub" = "repo:${var.github_owner}/${var.github_repo}:ref:refs/heads/*"
+          },
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
         }
       }

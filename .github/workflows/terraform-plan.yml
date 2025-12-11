@@ -3,22 +3,22 @@ name: Terraform PR Plan
 on:
   workflow_dispatch: {}
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened]           # Runs on new PR, code push, PR reopen
 
 jobs:
   terraform:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest             # Uses Ubuntu VM as runner VM
     permissions:
-      contents: read
-      id-token: write     # required for OIDC
+      contents: read      # Read access to repo contents
+      id-token: write     # Allows OIDC token creation for AWS
     steps:
-      - name: Checkout
+      - name: Checkout    # Downloads your repo to the runner VM.
         uses: actions/checkout@v4
 
-      - name: Setup Terraform
+      - name: Setup Terraform                 #Installs Terraform 1.5.0 on the runner.
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.5.0
+          terraform_version: 1.5.0 
 
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v2
@@ -26,7 +26,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Show runner path (debug)
+      - name: Show runner path (debug)      # debug step to show working directory
         run: |
           echo "Working dir: $(pwd)"
           ls -la

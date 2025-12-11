@@ -33,15 +33,6 @@ variable "subnet_3_az" {
 variable "s3_bucket" {
 }
 
-variable "ami" {
-}
-
-variable "instance_type" {
-}
-
-variable "key_name" {
-}
-
 variable "dynamodb_table" {
 
 }

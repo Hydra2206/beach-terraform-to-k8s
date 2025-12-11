@@ -2,9 +2,6 @@ name: Test OIDC Role Assumption
 
 on:
   workflow_dispatch: {}    # allows manual run from Actions UI
-  push:
-    branches:
-      - main
 
 permissions:
   id-token: write      # REQUIRED to allow OIDC token exchange
