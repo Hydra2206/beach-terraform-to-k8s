@@ -8,15 +8,16 @@ Deploying a Django application in EKS cluster in which everything is automated f
 
 2/12/2025 - Created ECR repo, OIDC provider manually from console, 2 IAM Roles (terraform role, deploy role)
             Created 2 workflow file for CI pipeline in Github Actions
-            debugged Configure AWS Credential via OIDC (Added oidc role arn in github secrets)
+Problem -> Error while executing Configure AWS Credential via OIDC: Could not load credentials from any providers
+Solution -> Added oidc role arn in github secrets
 
 (TASK FOR -> 3/12/2025)
-Problem -> Terraform Plan me aake stuck hoja raha hai woh var.ami ki value expect kar raha hai, locally toh variables ki value terraform.tfvars se mil jata hai but ab yeh find out karna hai ki pipeline me variables ki               values kaise pass karte hai
+Problem -> Terraform Plan me aake stuck hoja raha hai woh var.ami ki value expect kar raha hai, locally toh variables ki value terraform.tfvars se mil jata hai but ab yeh find out karna hai ki pipeline me variables ki values kaise pass karte hai
 
-Solution -> Jitne bhi variables hai tf code me un sabko AWS secrets manager me store kiya in a single secret file(JSON key-value), then iam oidc role me ek policy attach kiya joh woh secrets ko read kar paye Github                   action me jab CI pipeline run hoga tab, then terraform plan workflow me bhi changes kiya.
+Solution -> Jitne bhi variables hai tf code me un sabko AWS secrets manager me store kiya in a single secret file(JSON key-value), then iam oidc role me ek policy attach kiya joh woh secrets ko read kar paye Github action me jab CI pipeline run hoga tab, then terraform             plan workflow me bhi changes kiya.
 
 3/12/2025 - terraform-plan.yml workflow success bahut sare fixes karne ke baad
-            ci-main.yml workflow me ek stage add kiya hu joh ki yeh ensure karega ki jab bhi terraform apply stage fail hojayega tab terraform destroy stage run hoga joh ki woh resources ko delete kar dengi joh apply ke              time pura create nahi ho payi thi
+            ci-main.yml workflow me ek stage add kiya hu joh ki yeh ensure karega ki jab bhi terraform apply stage fail hojayega tab terraform destroy stage run hoga joh ki woh resources ko delete kar dengi joh apply ke time pura create nahi ho payi thi
             oidc-iam-role me full Administrator access de diya yeh github action ko allow kar raha hai aws me resource create karne ke liye through oidc
 
 (TASK FOR -> 4/12/2025) last workflow run check karna usme s3 object upload kar rahe hai woh error aara hai, usko resolve karna hai (resolved - Changed some commands to upload file in instances)
@@ -40,7 +41,8 @@ Solution -> Created a config-map & mapped my aws root account into it & applied 
 
 Project successful !!!
 
-Problem (Optional) - whenever terraform is trying to destroy ECR it is unable to destroy it bcoz there is an image inside ECR repo. try to find a way in which somehow 1st delete the image then repo.
+Problem (Optional) - 1) whenever terraform is trying to destroy ECR it is unable to destroy it bcoz there is an image inside ECR repo. try to find a way in which somehow 1st delete the image then repo.
+                     2) we can do backend & state locking config in terraform init stage like this, (terraform init -input=false -backend-config="bucket=${{ secrets.TFSTATE_BUCKET }}" -backend-config="dynamodb_table=${{ secrets.DYNAMODB_TABLE }}" -backend-                                      config="region=${{ secrets.AWS_REGION }}") will test this out 
             
             
             
