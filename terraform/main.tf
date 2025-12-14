@@ -13,8 +13,11 @@ module "vpc" {
   azs             = ["${var.region}a", "${var.region}b", "${var.region}c"]
   private_subnets = var.private_subnets
 
-  enable_nat_gateway = false
-  single_nat_gateway = true
+  enable_nat_gateway = false   #not to create any NAT Gateway
+  single_nat_gateway = true    #if NAT is enabled, create only one NAT Gateway and share it across all private subnets
+
+  map_public_ip_on_launch = true
+
 }
 
 
@@ -28,7 +31,6 @@ module "subnets" {
   subnet-2-az   = var.subnet_2_az
   subnet-3-az   = var.subnet_3_az
   vpc_id        = module.vpc.vpc_id
-
 
 }
 
