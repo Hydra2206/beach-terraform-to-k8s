@@ -1,5 +1,5 @@
 # beach-terraform-to-k8s
-Creating a project for resume and learning how to create CI/CD pipeline for automate infra provisioning with Terraform, build container, push images, automated rollout to k8s cluster, with automatic rollbacks if apply fails.
+Creating a project for resume and learning how to create CI/CD pipeline from automating infra provisioning with Terraform, build container, push images, automated rollout to k8s cluster and with automatic rollbacks if apply fails.
 
 what is the overall purpose of this project?
 Deploying a Django application in EKS cluster in which everything is automated from infra-provisioning to build-push-deploy. When anyone takes a PR or push the code this pipeline will run & perform all the tasks.
