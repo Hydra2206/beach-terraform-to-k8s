@@ -42,6 +42,7 @@ Solution -> Created a config-map & mapped my aws root account into it & applied 
 Project successful !!!
 
 Problem (Optional) - 1) whenever terraform is trying to destroy ECR it is unable to destroy it bcoz there is an image inside ECR repo. try to find a way in which somehow 1st delete the image then repo.
+                        woh image ko terraform import kar sakta hai fir usko delete kar sakte hu code ke through hi (try karunga)
                      2) we can do backend & state locking config in terraform init stage like this, (terraform init -input=false -backend-config="bucket=${{ secrets.TFSTATE_BUCKET }}" -backend-config="dynamodb_table=${{ secrets.DYNAMODB_TABLE }}" -backend-                                      config="region=${{ secrets.AWS_REGION }}") will test this out 
             
             
