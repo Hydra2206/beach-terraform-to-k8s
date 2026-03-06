@@ -158,6 +158,7 @@ resource "aws_eks_node_group" "workers" {
 resource "aws_ecr_repository" "ecr_repo" {
   name                 = var.ecr_name
   image_tag_mutability = "IMMUTABLE" # prevents tag mutation (recommended)
+  force_delete = true
   image_scanning_configuration {
     scan_on_push = false # enable scan on push
   }
